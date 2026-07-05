@@ -20,6 +20,11 @@
 # META   }
 # META }
 
+# MARKDOWN ********************
+
+# ### Parameters – Lakehouse name
+# Sets the `lakehousename` variable used to build SQL queries against the Dataverse Lakehouse.
+
 # PARAMETERS CELL ********************
 
 lakehousename = "dataverse_contosojbend_cds2_workspace_unq1d69ab079f7ff011a7007c1e52172"
@@ -31,9 +36,14 @@ lakehousename = "dataverse_contosojbend_cds2_workspace_unq1d69ab079f7ff011a7007c
 # META   "language_group": "synapse_pyspark"
 # META }
 
+# MARKDOWN ********************
+
+# ### Load conversation transcript data
+# Runs a SQL query against the Dataverse Lakehouse to load the `conversationtranscript` table into a Spark DataFrame `ct_df`, ordered by `conversationstarttime` (most recent first).
+
 # CELL ********************
 
-query = f"SELECT id, conversationstarttime as conversation_starttime, bot_conversationtranscriptidname, content FROM {lakehousename}.conversationtranscript ORDER BY conversationstarttime DESC"
+query = f"SELECT id, conversationstarttime as conversation_starttime, bot_conversationtranscriptidname, bot_conversationtranscriptId, content FROM {lakehousename}.conversationtranscript ORDER BY conversationstarttime DESC"
 ct_df = spark.sql(query)
 display(ct_df)
 
@@ -44,6 +54,11 @@ display(ct_df)
 # META   "language": "python",
 # META   "language_group": "synapse_pyspark"
 # META }
+
+# MARKDOWN ********************
+
+# ### Parse JSON `content` column and flatten top-level fields
+# Samples a non-null JSON value from the `content` column, infers its schema, parses it into a struct (`content_json`), and flattens its top-level fields into `parsed_df` while keeping key transcript metadata.
 
 # CELL ********************
 
@@ -75,6 +90,7 @@ else:
         "id",
         "conversation_starttime",
         "bot_conversationtranscriptidname",
+        "bot_conversationtranscriptId",
         # expand all JSON fields as individual columns
         "content_json.*"
     )
@@ -89,6 +105,11 @@ display(parsed_df)
 # META   "language": "python",
 # META   "language_group": "synapse_pyspark"
 # META }
+
+# MARKDOWN ********************
+
+# ### Detect and explode array field for conversation parts
+# Automatically detects array-type columns in `parsed_df`, explodes the first one to create one row per conversation part, filters to only `type == "message"`, and stores the result as `conversation_df` with a `conversation_part_json` struct column.
 
 # CELL ********************
 
@@ -133,6 +154,7 @@ else:
         "id",
         "conversation_starttime",
         "bot_conversationtranscriptidname",
+        "bot_conversationtranscriptId",
         col("conversation_part").alias("conversation_part_json")
     )
 
@@ -146,6 +168,11 @@ display(conversation_df)
 # META   "language_group": "synapse_pyspark"
 # META }
 
+# MARKDOWN ********************
+
+# ### Extract message-level fields from `conversation_part_json`
+# Projects key fields out of the `conversation_part_json` struct (channel, text, sender details, timestamp), converts the timestamp to a proper Spark `timestamp`, and orders messages by newest first, producing `conversation_df_with_fields`.
+
 # CELL ********************
 
 from pyspark.sql.functions import col, from_unixtime
@@ -157,6 +184,7 @@ conversation_df_with_fields = (
         "id",
         "conversation_starttime",
         "bot_conversationtranscriptidname",
+        "bot_conversationtranscriptId",
         "conversation_part_json",
         # top-level fields on the struct
         col("conversation_part_json.channelId").alias("channelId"),
@@ -187,38 +215,15 @@ display(conversation_df_with_fields)
 # META   "language_group": "synapse_pyspark"
 # META }
 
-# CELL ********************
+# MARKDOWN ********************
 
-from pyspark.sql.functions import col, when
-
-# Create a new 'from' column based on from_role
-conversation_df_simplified = (
-    conversation_df_with_fields
-    .withColumn(
-        "from",
-        when(col("from_role") == 0, col("from_id"))
-        .when(col("from_role") == 1, col("from_aadObjectId"))
-        .otherwise(col("from_id"))  # fallback if role is something else/null
-    )
-    .drop("from_aadObjectId", "from_id", "conversation_part_timestamp")
-)
-
-display(conversation_df_simplified)
-
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark",
-# META   "frozen": true,
-# META   "editable": false
-# META }
+# ### Load system user data
+# Queries the Dataverse `systemuser` table to retrieve user identity information (AAD object ID, full name, email) into `user_df` for later joins with conversation data.
 
 # CELL ********************
 
-query = f"SELECT id, azureactivedirectoryobjectid, fullname, internalemailaddress  FROM {lakehousename}.systemuser where azureactivedirectoryobjectid IS NOT NULL"
-user_df = spark.sql(query)
+userquery = f"SELECT id, azureactivedirectoryobjectid, fullname, internalemailaddress  FROM {lakehousename}.systemuser where azureactivedirectoryobjectid IS NOT NULL"
+user_df = spark.sql(userquery)
 display(user_df)
 
 # METADATA ********************
@@ -228,22 +233,17 @@ display(user_df)
 # META   "language_group": "synapse_pyspark"
 # META }
 
-# CELL ********************
+# MARKDOWN ********************
 
-query = f"SELECT *  FROM {lakehousename}.agent"
-agent_df = spark.sql(query)
-display(agent_df)
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
+# ### Join conversations with user details and derive friendly sender name
+# Renames key user columns in `user_df`, left-joins `conversation_df_with_fields` with user data using the AAD object ID, and constructs a readable `from` field:
+# - Bot messages show the bot name (`bot_conversationtranscriptidname`)
+# - User messages show the user full name from Dataverse.
+# The result is stored in `conversation_with_user`.
 
 # CELL ********************
 
-from pyspark.sql.functions import col
+from pyspark.sql.functions import col, when
 
 # Rename columns in user_df
 user_df_renamed = (
@@ -264,10 +264,31 @@ conversation_with_user = (
         col("c.from_aadObjectId") == col("u.userentraid"),
         how="left"
     )
+    .withColumn(
+        "from",
+        when(col("c.from_role") == 0, col("c.bot_conversationtranscriptidname"))
+        .when(col("c.from_role") == 1, col("u.userfullname"))
+    )
 )
 
 display(conversation_with_user)
 
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# MARKDOWN ********************
+
+# ### Persist enriched conversation data
+# Writes the `conversation_with_user` DataFrame as a managed table named `copilotconversation` in the default Lakehouse, overwriting any existing table with that name.
+
+# CELL ********************
+
+# Write the conversation_with_user DataFrame to the default Lakehouse
+conversation_with_user.write.mode("overwrite").saveAsTable("copilotconversation")
 
 # METADATA ********************
 
