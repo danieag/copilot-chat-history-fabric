@@ -43,7 +43,17 @@ lakehousename = "dataverse_contosojbend_cds2_workspace_unq1d69ab079f7ff011a7007c
 
 # CELL ********************
 
-query = f"SELECT id, conversationstarttime as conversation_starttime, bot_conversationtranscriptidname, bot_conversationtranscriptId, content FROM {lakehousename}.conversationtranscript ORDER BY conversationstarttime DESC"
+query = f"""
+SELECT
+  id,
+  conversationstarttime AS conversation_starttime,
+  DATE(conversationstarttime) AS conversation_startdate,
+  bot_conversationtranscriptidname,
+  bot_conversationtranscriptId,
+  content
+FROM {lakehousename}.conversationtranscript
+ORDER BY conversationstarttime DESC
+"""
 ct_df = spark.sql(query)
 display(ct_df)
 
@@ -89,6 +99,7 @@ else:
     parsed_df = ct_with_json.select(
         "id",
         "conversation_starttime",
+        "conversation_startdate",
         "bot_conversationtranscriptidname",
         "bot_conversationtranscriptId",
         # expand all JSON fields as individual columns
@@ -153,6 +164,7 @@ else:
     conversation_df = filtered_df.select(
         "id",
         "conversation_starttime",
+        "conversation_startdate",
         "bot_conversationtranscriptidname",
         "bot_conversationtranscriptId",
         col("conversation_part").alias("conversation_part_json")
@@ -183,6 +195,7 @@ conversation_df_with_fields = (
     .select(
         "id",
         "conversation_starttime",
+        "conversation_startdate",
         "bot_conversationtranscriptidname",
         "bot_conversationtranscriptId",
         "conversation_part_json",
@@ -243,7 +256,7 @@ display(user_df)
 
 # CELL ********************
 
-from pyspark.sql.functions import col, when
+from pyspark.sql.functions import col, when, lit
 
 # Rename columns in user_df
 user_df_renamed = (
@@ -269,9 +282,16 @@ conversation_with_user = (
         when(col("c.from_role") == 0, col("c.bot_conversationtranscriptidname"))
         .when(col("c.from_role") == 1, col("u.userfullname"))
     )
+    .withColumn(
+        "from_icon",
+        when(col("c.from_role") == 0, lit("🤖"))
+        .when(col("c.from_role") == 1, lit("👤"))
+        .otherwise(lit(""))
+    )
 )
 
 display(conversation_with_user)
+
 
 # METADATA ********************
 
@@ -287,8 +307,9 @@ display(conversation_with_user)
 
 # CELL ********************
 
-# Write the conversation_with_user DataFrame to the default Lakehouse
-conversation_with_user.write.mode("overwrite").saveAsTable("copilotconversation")
+# Write the conversation_with_user DataFrame to the default Lakehouse,
+# allowing the table schema to be updated (e.g., new columns like conversation_startdate)
+conversation_with_user.write.option("overwriteSchema", "true").mode("overwrite").saveAsTable("copilotconversation")
 
 # METADATA ********************
 
