@@ -49,7 +49,7 @@
                     [
                       {
                         "Literal": {
-                          "Value": "'F1 Databricks Agent'"
+                          "Value": "'Agent'"
                         }
                       }
                     ]
@@ -70,8 +70,6 @@
       {
         "name": "24aae34679230f75e811",
         "boundFilter": "f0ae52a36ba281a41b4b",
-        "asAggregation": false,
-        "qnaSingleSelectRequired": false,
         "fieldExpr": {
           "Column": {
             "Expression": {

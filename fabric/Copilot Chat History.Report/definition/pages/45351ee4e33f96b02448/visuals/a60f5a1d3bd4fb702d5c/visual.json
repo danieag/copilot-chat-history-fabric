@@ -4,7 +4,7 @@
   "position": {
     "x": 907.6791348411291,
     "y": 0,
-    "z": 5,
+    "z": 5000,
     "height": 108.78225489467032,
     "width": 186.23522037967558
   },
@@ -211,24 +211,6 @@
       "filterChanges": true
     },
     "drillFilterOtherVisuals": true
-  },
-  "filterConfig": {
-    "filters": [
-      {
-        "name": "799e8ad9c56032203bd9",
-        "field": {
-          "Column": {
-            "Expression": {
-              "SourceRef": {
-                "Entity": "copilotconversation"
-              }
-            },
-            "Property": "Copilot Agent"
-          }
-        },
-        "type": "Categorical"
-      }
-    ]
   },
   "howCreated": "Copilot"
 }

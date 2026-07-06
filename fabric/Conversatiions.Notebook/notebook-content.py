@@ -22,6 +22,10 @@
 
 # MARKDOWN ********************
 
+# # Conversations Notebook
+
+# MARKDOWN ********************
+
 # ### Parameters – Lakehouse name
 # Sets the `lakehousename` variable used to build SQL queries against the Dataverse Lakehouse.
 
@@ -68,7 +72,9 @@ display(ct_df)
 # MARKDOWN ********************
 
 # ### Parse JSON `content` column and flatten top-level fields
-# Samples a non-null JSON value from the `content` column, infers its schema, parses it into a struct (`content_json`), and flattens its top-level fields into `parsed_df` while keeping key transcript metadata.
+# Samples a non-null JSON value from the `content` column, infers its schema, parses it into a struct (`content_json`), and flattens its top-level fields into `parsed_df` while keeping key transcript metadata (`id`, `conversation_starttime`, `conversation_startdate`, `bot_conversationtranscriptidname`, `bot_conversationtranscriptId`).
+# 
+# If no non-null JSON values are found in `content`, the code skips JSON parsing and simply returns a `parsed_df` that contains only the basic conversation metadata columns.
 
 # CELL ********************
 
@@ -120,7 +126,9 @@ display(parsed_df)
 # MARKDOWN ********************
 
 # ### Detect and explode array field for conversation parts
-# Automatically detects array-type columns in `parsed_df`, explodes the first one to create one row per conversation part, filters to only `type == "message"`, and stores the result as `conversation_df` with a `conversation_part_json` struct column.
+# Automatically detects array-type columns in `parsed_df`, chooses the **first** array column as the conversation-parts container, explodes it to create one row per conversation part, filters to only `type == "message"`, and stores the result as `conversation_df` with a `conversation_part_json` struct column.
+# 
+# If no array-type columns are present in `parsed_df`, the code leaves the data unmodified and assigns `conversation_df = parsed_df`.
 
 # CELL ********************
 
@@ -183,7 +191,7 @@ display(conversation_df)
 # MARKDOWN ********************
 
 # ### Extract message-level fields from `conversation_part_json`
-# Projects key fields out of the `conversation_part_json` struct (channel, text, sender details, timestamp), converts the timestamp to a proper Spark `timestamp`, and orders messages by newest first, producing `conversation_df_with_fields`.
+# Projects key fields out of the `conversation_part_json` struct (channel, text, sender details, timestamp), converts the epoch timestamp to a proper Spark `timestamp`, orders messages by newest first, and produces `conversation_df_with_fields` while keeping the original `conversation_part_json` struct for further exploration if needed.
 
 # CELL ********************
 
@@ -231,7 +239,7 @@ display(conversation_df_with_fields)
 # MARKDOWN ********************
 
 # ### Load system user data
-# Queries the Dataverse `systemuser` table to retrieve user identity information (AAD object ID, full name, email) into `user_df` for later joins with conversation data.
+# Queries the Dataverse `systemuser` table in the same Lakehouse to retrieve user identity information (AAD object ID, full name, email) into `user_df`. Only rows with a non-null `azureactivedirectoryobjectid` are loaded so that they can be joined reliably with conversation messages later.
 
 # CELL ********************
 
@@ -249,10 +257,11 @@ display(user_df)
 # MARKDOWN ********************
 
 # ### Join conversations with user details and derive friendly sender name
-# Renames key user columns in `user_df`, left-joins `conversation_df_with_fields` with user data using the AAD object ID, and constructs a readable `from` field:
-# - Bot messages show the bot name (`bot_conversationtranscriptidname`)
-# - User messages show the user full name from Dataverse.
-# The result is stored in `conversation_with_user`.
+# Renames key user columns in `user_df`, left-joins `conversation_df_with_fields` with user data using the AAD object ID (`from_aadObjectId` ⇔ `userentraid`), and constructs a readable `from` field:
+# - Bot messages (`from_role == 0`) show the bot name (`bot_conversationtranscriptidname`)
+# - User messages (`from_role == 1`) show the user full name from Dataverse (`userfullname`).
+# 
+# The code also adds a `from_icon` column (🤖 for bot, 👤 for user) and stores the result in `conversation_with_user`.
 
 # CELL ********************
 
@@ -303,13 +312,15 @@ display(conversation_with_user)
 # MARKDOWN ********************
 
 # ### Persist enriched conversation data
-# Writes the `conversation_with_user` DataFrame as a managed table named `copilotconversation` in the default Lakehouse, overwriting any existing table with that name.
+# Writes the `conversation_with_user` DataFrame as a managed Delta table named `copilotconversation` in the default Lakehouse (`CopilotObservability`), overwriting any existing table with that name and allowing schema evolution via `overwriteSchema = true`. After writing, it issues a `REFRESH TABLE dbo.copilotconversation` to make sure downstream queries see the latest metadata and data.
 
 # CELL ********************
 
 # Write the conversation_with_user DataFrame to the default Lakehouse,
 # allowing the table schema to be updated (e.g., new columns like conversation_startdate)
 conversation_with_user.write.option("overwriteSchema", "true").mode("overwrite").saveAsTable("copilotconversation")
+
+spark.sql(f"REFRESH TABLE dbo.copilotconversation")
 
 # METADATA ********************
 

@@ -4,7 +4,7 @@
   "position": {
     "x": 0,
     "y": 119.22535136455866,
-    "z": 1,
+    "z": 0,
     "height": 292.40670115687379,
     "width": 630.93707838908779
   },
@@ -246,29 +246,6 @@
       ]
     },
     "drillFilterOtherVisuals": true
-  },
-  "filterConfig": {
-    "filters": [
-      {
-        "name": "c69f38b992c9da0f5b82",
-        "field": {
-          "Aggregation": {
-            "Expression": {
-              "Column": {
-                "Expression": {
-                  "SourceRef": {
-                    "Entity": "copilotconversation"
-                  }
-                },
-                "Property": "Conversation Id"
-              }
-            },
-            "Function": 2
-          }
-        },
-        "type": "Advanced"
-      }
-    ]
   },
   "howCreated": "Copilot"
 }

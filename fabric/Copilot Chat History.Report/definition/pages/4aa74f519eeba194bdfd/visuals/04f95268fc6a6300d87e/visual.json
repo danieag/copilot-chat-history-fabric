@@ -2,11 +2,12 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.10.0/schema.json",
   "name": "04f95268fc6a6300d87e",
   "position": {
-    "x": 256.72612155142195,
-    "y": 138.37102822602063,
-    "z": 4,
-    "height": 456.88547055761535,
-    "width": 1015.591131696642
+    "x": 257.13274336283183,
+    "y": 138.19469026548671,
+    "z": 4000,
+    "height": 552.77876106194685,
+    "width": 1014.9380530973451,
+    "tabOrder": 5000
   },
   "visual": {
     "visualType": "tableEx",
@@ -41,6 +42,21 @@
               },
               "queryRef": "copilotconversation.Channel",
               "nativeQueryRef": "Channel"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "copilotconversation"
+                    }
+                  },
+                  "Property": "From Icon"
+                }
+              },
+              "queryRef": "copilotconversation.From Icon",
+              "nativeQueryRef": "Icon",
+              "displayName": "Icon"
             },
             {
               "field": {
@@ -107,5 +123,61 @@
       ]
     },
     "drillFilterOtherVisuals": true
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "5f0e1d11970cbc95edc3",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "copilotconversation"
+              }
+            },
+            "Property": "Conversation Text"
+          }
+        },
+        "type": "Advanced",
+        "filter": {
+          "Version": 2,
+          "From": [
+            {
+              "Name": "c",
+              "Entity": "copilotconversation",
+              "Type": 0
+            }
+          ],
+          "Where": [
+            {
+              "Condition": {
+                "Not": {
+                  "Expression": {
+                    "Comparison": {
+                      "ComparisonKind": 0,
+                      "Left": {
+                        "Column": {
+                          "Expression": {
+                            "SourceRef": {
+                              "Source": "c"
+                            }
+                          },
+                          "Property": "Conversation Text"
+                        }
+                      },
+                      "Right": {
+                        "Literal": {
+                          "Value": "null"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
   }
 }

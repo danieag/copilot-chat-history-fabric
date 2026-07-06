@@ -199,6 +199,17 @@ table copilotconversation
 
 		annotation SummarizationSetBy = Automatic
 
+	column 'From Icon'
+		dataType: string
+		lineageTag: 04b308d7-0f39-40a2-b00e-da63c3b1a7ec
+		sourceLineageTag: from_icon
+		summarizeBy: none
+		sourceColumn: from_icon
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
 	partition copilotconversation = entity
 		mode: directLake
 		source
