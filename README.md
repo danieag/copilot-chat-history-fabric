@@ -3,7 +3,9 @@
 **Under Construction**
 
 ## Overview
-For many Copilot Studio makers and administrators it can be challenging to pull the conversation transcript data from Dataverse.  Thus, I created this repo that allows you to easily view the data in a Power BI report within a Fabric Workspace.  Below are some screenshots for reference.
+For many Copilot Studio makers and administrators it can be challenging to pull the conversation transcript data from Dataverse and understanding Application Inishgts and Log Analytics in Azure may be "a bridge too far".  
+
+Thus, I created this repo that allows you to easily view the Copilot Conversation History in a Power BI report within a Fabric Workspace.  Below are some screenshots for reference.
 
 ![Conversation Summary](img/conversationsummary.png)
 ![Conversation Detail](img/conversationdetail.png)
